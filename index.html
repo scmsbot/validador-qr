@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#0078D4">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ValidaQR">
+  <meta name="description" content="Sistema de control de acceso - Hospital Felix Bulnes">
+  
+  <title>Validador QR - Hospital Felix Bulnes</title>
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%230078D4' width='192' height='192'/><text x='50%' y='50%' text-anchor='middle' dy='.3em' fill='white' font-size='80' font-weight='bold'>QR</text></svg>">
+  
+  <!-- Librería QR Scanner -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    :root {
+      --color-primary: #0078D4;
+      --color-success: #107C10;
+      --color-warning: #F2A900;
+      --color-danger: #C4314B;
+      --color-gray: #595959;
+      --color-light: #f3f2f1;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, var(--color-primary) 0%, #005A9E 100%);
+      min-height: 100vh;
+      color: #333;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .container {
+      max-width: 500px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 20px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .header {
+      text-align: center;
+      color: white;
+      margin-bottom: 20px;
+      padding: 20px 0;
+    }
+    
+    .header h1 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+    
+    .header p {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+    
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+      margin-bottom: 16px;
+      animation: slideUp 0.4s ease;
+    }
+    
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .scanner-container {
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 16px;
+      min-height: 280px;
+      position: relative;
+    }
+    
+    #qr-reader {
+      width: 100%;
+    }
+    
+    #qr-reader__dashboard_section_csr button {
+      background: var(--color-primary) !important;
+      color: white !important;
+      padding: 10px 20px !important;
+      border: none !important;
+      border-radius: 8px !important;
+      font-size: 14px !important;
+      cursor: pointer !important;
+    }
+    
+    .input-group {
+      margin-bottom: 16px;
+    }
+    
+    .input-group label {
+      display: block;
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    
+    .input-group input {
+      width: 100%;
+      padding: 14px 16px;
+      border: 2px solid #e1e1e1;
+      border-radius: 10px;
+      font-size: 16px;
+      font-family: monospace;
+      transition: border-color 0.2s;
+    }
+    
+    .input-group input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    
+    .btn-primary { background: var(--color-primary); color: white; }
+    .btn-success { background: var(--color-success); color: white; }
+    .btn-secondary { background: var(--color-light); color: #333; }
+    
+    .spinner {
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top: 3px solid white;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    .estado-badge {
+      display: inline-block;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+      margin: 0 auto 16px;
+      text-align: center;
+    }
+    
+    .estado-VALIDO { background: #DFF6DD; color: var(--color-success); }
+    .estado-NO_EXISTE, .estado-EXPIRADO, .estado-CANCELADO, .estado-BLOQUEADO, .estado-ERROR { background: #FDE7E9; color: var(--color-danger); }
+    .estado-YA_USADO { background: #FFF4CE; color: #835F00; }
+    
+    .resultado-mensaje {
+      font-size: 24px;
+      font-weight: 700;
+      text-align: center;
+      margin: 20px 0;
+    }
+    
+    .datos-visitante {
+      background: #f9f9f9;
+      border-radius: 10px;
+      padding: 16px;
+      margin: 16px 0;
+    }
+    
+    .dato-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #eee;
+      font-size: 14px;
+      gap: 10px;
+    }
+    
+    .dato-row:last-child { border-bottom: none; }
+    .dato-label { color: #666; font-weight: 500; flex-shrink: 0; }
+    .dato-valor { color: #333; font-weight: 600; text-align: right; word-break: break-word; flex: 1; }
+    
+    .success-screen {
+      text-align: center;
+      padding: 40px 20px;
+    }
+    
+    .success-icon {
+      font-size: 80px;
+      margin-bottom: 20px;
+      animation: bounce 0.6s ease;
+    }
+    
+    @keyframes bounce {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+    }
+    
+    .patente-destacada {
+      background: linear-gradient(135deg, #FFC107 0%, #FFB300 100%);
+      color: #000;
+      font-family: 'Courier New', monospace;
+      font-size: 24px;
+      font-weight: bold;
+      text-align: center;
+      padding: 12px 16px;
+      border-radius: 8px;
+      letter-spacing: 3px;
+      margin: 12px 0;
+      border: 3px solid #000;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    
+    .config-info {
+      background: #E1F5FE;
+      border-left: 4px solid #0288D1;
+      padding: 12px;
+      border-radius: 8px;
+      margin: 16px 0;
+      font-size: 12px;
+      color: #0288D1;
+    }
+    
+    .footer {
+      text-align: center;
+      color: rgba(255,255,255,0.7);
+      font-size: 11px;
+      padding: 20px 0;
+    }
+    
+    .hidden { display: none !important; }
+    
+    .icon-large {
+      font-size: 64px;
+      text-align: center;
+      margin: 16px 0;
+    }
+    
+    .error-message {
+      background: #FDE7E9;
+      border-left: 4px solid var(--color-danger);
+      padding: 12px;
+      border-radius: 8px;
+      color: var(--color-danger);
+      font-size: 13px;
+      margin: 12px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎫 Validador de Acceso</h1>
+      <p>Hospital Felix Bulnes</p>
+    </div>
+    
+    <!-- PANTALLA 1: ESCANEO -->
+    <div id="screen-scan" class="card hidden">
+      <div class="config-info" id="config-info">
+        ⚙️ Verificando configuración...
+      </div>
+      
+      <div class="scanner-container" id="scanner-container" style="display: none;">
+        <div id="qr-reader"></div>
+      </div>
+      
+      <div id="camera-status" style="text-align: center; padding: 40px 20px; background: #000; border-radius: 12px; color: white; margin-bottom: 16px;">
+        <div style="font-size: 48px; margin-bottom: 12px;">📷</div>
+        <p style="margin-bottom: 12px;">Solicitar acceso a cámara...</p>
+        <button class="btn btn-primary" onclick="solicitarCamara()">
+          🎥 Activar cámara
+        </button>
+      </div>
+      
+      <div class="input-group">
+        <label>O ingrese el código manualmente:</label>
+        <input type="text" id="codigo-manual" placeholder="FB-XXXXXXXXXXXXXX-XXXXXXXX" autocomplete="off">
+      </div>
+      
+      <button class="btn btn-primary" onclick="validarCodigoManual()">
+        🔍 Validar Código
+      </button>
+    </div>
+    
+    <!-- PANTALLA 2: VALIDACIÓN -->
+    <div id="screen-result" class="card hidden">
+      <div id="loading-result" class="success-screen">
+        <div class="spinner" style="border-color: #ddd; border-top-color: var(--color-primary); width: 50px; height: 50px; margin: 20px auto;"></div>
+        <p>Validando código...</p>
+      </div>
+      
+      <div id="result-content" class="hidden">
+        <div id="result-icon" class="icon-large"></div>
+        <div id="result-message" class="resultado-mensaje"></div>
+        <div id="result-status" class="estado-badge"></div>
+        
+        <div id="visitor-data" class="datos-visitante hidden"></div>
+        
+        <button id="btn-confirm" class="btn btn-success hidden" onclick="confirmarIngreso()">
+          ✅ Confirmar Ingreso
+        </button>
+        
+        <button class="btn btn-secondary" style="margin-top: 12px;" onclick="volverEscaneo()">
+          ← Volver
+        </button>
+      </div>
+    </div>
+    
+    <!-- PANTALLA 3: ÉXITO -->
+    <div id="screen-success" class="card hidden">
+      <div class="success-screen">
+        <div class="success-icon">🎉</div>
+        <h2 style="color: var(--color-success); margin-bottom: 10px;">¡Bienvenido!</h2>
+        <p id="success-name" style="font-size: 18px; font-weight: 600; margin-bottom: 8px;"></p>
+        <p id="success-time" style="color: #666; font-size: 14px;"></p>
+        <p style="color: #999; font-size: 12px; margin-top: 20px;">
+          Volviendo en <span id="countdown">10</span>s...
+        </p>
+        <button class="btn btn-primary" style="margin-top: 20px;" onclick="volverEscaneo()">
+          Validar otro código
+        </button>
+      </div>
+    </div>
+    
+    <div class="footer">
+      Sistema Control de Acceso · PWA v4.0
+    </div>
+  </div>
+
+  <script>
+    // ═══════════════════════════════════════════════════════════
+    // CONFIGURACIÓN
+    // ═══════════════════════════════════════════════════════════
+    
+    // ⚠️ EDITAR ESTA VARIABLE CON TU URL DE APPS SCRIPT
+    const API_URL = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID_HERE/usercontent';
+    
+    // ═══════════════════════════════════════════════════════════
+    // VARIABLES GLOBALES
+    // ═══════════════════════════════════════════════════════════
+    
+    let html5QrCode = null;
+    let codigoActual = null;
+    let countdownInterval = null;
+    
+    const esIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const esAndroid = /Android/.test(navigator.userAgent);
+    const esSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+    const esChrome = /Chrome|Chromium|CriOS/.test(navigator.userAgent);
+    
+    // ═══════════════════════════════════════════════════════════
+    // INICIALIZACIÓN
+    // ═══════════════════════════════════════════════════════════
+    
+    window.addEventListener('load', () => {
+      verificarConfiguracion();
+      
+      const qrParam = new URLSearchParams(window.location.search).get('qr');
+      if (qrParam) {
+        document.getElementById('screen-scan').classList.remove('hidden');
+        document.getElementById('codigo-manual').value = qrParam;
+        setTimeout(() => validarCodigoManual(), 300);
+      } else {
+        document.getElementById('screen-scan').classList.remove('hidden');
+      }
+    });
+    
+    function verificarConfiguracion() {
+      const configInfo = document.getElementById('config-info');
+      
+      if (API_URL.includes('YOUR_SCRIPT_ID')) {
+        configInfo.innerHTML = `
+          <strong>⚠️ Configuración incompleta</strong><br>
+          Cambia API_URL en el código con tu Script ID de Apps Script
+        `;
+        configInfo.style.background = '#FFEBEE';
+        configInfo.style.color = '#C4314B';
+        configInfo.style.borderLeftColor = '#C4314B';
+      } else {
+        configInfo.innerHTML = `
+          ✅ Conectado a: ${API_URL.substring(0, 50)}...
+        `;
+        configInfo.style.background = '#E8F5E9';
+        configInfo.style.color = var(--color-success);
+        configInfo.style.borderLeftColor = var(--color-success);
+      }
+    }
+    
+    // ═══════════════════════════════════════════════════════════
+    // CÁMARA
+    // ═══════════════════════════════════════════════════════════
+    
+    async function solicitarCamara() {
+      const statusEl = document.getElementById('camera-status');
+      
+      if (!navigator.mediaDevices?.getUserMedia) {
+        statusEl.innerHTML = '❌ Tu navegador no soporta cámara';
+        return;
+      }
+      
+      try {
+        console.log('Solicitando acceso a cámara...');
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' }
+        });
+        
+        // Detener este stream (solo era para pedir permiso)
+        stream.getTracks().forEach(t => t.stop());
+        
+        console.log('✅ Permiso concedido');
+        statusEl.style.display = 'none';
+        document.getElementById('scanner-container').style.display = 'block';
+        iniciarEscaner();
+        
+      } catch (error) {
+        console.error('Error de cámara:', error.name, error.message);
+        
+        let msg = '';
+        if (error.name === 'NotAllowedError') {
+          msg = '🚫 Permiso denegado. Activa cámara en configuración del navegador.';
+        } else if (error.name === 'NotFoundError') {
+          msg = '📷 No se encontró cámara en este dispositivo.';
+        } else if (error.name === 'NotReadableError') {
+          msg = '🔒 La cámara está siendo usada por otra app.';
+        } else {
+          msg = '❌ Error: ' + error.message;
+        }
+        
+        statusEl.innerHTML = `
+          <div style="font-size: 48px; margin-bottom: 12px;">❌</div>
+          <p style="margin-bottom: 12px;">${msg}</p>
+          <button class="btn btn-secondary" onclick="solicitarCamara()">
+            🔄 Reintentar
+          </button>
+        `;
+      }
+    }
+    
+    async function iniciarEscaner() {
+      try {
+        if (html5QrCode?.isScanning) {
+          await html5QrCode.stop();
+        }
+        
+        html5QrCode = new Html5Qrcode("qr-reader");
+        
+        await html5QrCode.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: { width: 220, height: 220 } },
+          (texto) => {
+            html5QrCode.stop();
+            procesarQR(texto);
+          },
+          () => {}
+        );
+      } catch (err) {
+        console.error('Error escáner:', err);
+      }
+    }
+    
+    function procesarQR(texto) {
+      let codigo = texto;
+      try {
+        const url = new URL(texto);
+        const param = url.searchParams.get('qr');
+        if (param) codigo = param;
+      } catch (e) {}
+      
+      validarCodigo(codigo);
+    }
+    
+    function detenerEscaner() {
+      if (html5QrCode?.isScanning) {
+        return html5QrCode.stop().catch(() => {});
+      }
+      return Promise.resolve();
+    }
+    
+    // ═══════════════════════════════════════════════════════════
+    // VALIDACIÓN
+    // ═══════════════════════════════════════════════════════════
+    
+    function validarCodigoManual() {
+      const codigo = document.getElementById('codigo-manual').value.trim();
+      if (!codigo) {
+        alert('⚠️ Ingrese un código');
+        return;
+      }
+      detenerEscaner().then(() => validarCodigo(codigo));
+    }
+    
+    async function validarCodigo(codigo) {
+      codigoActual = codigo;
+      
+      document.getElementById('screen-scan').classList.add('hidden');
+      document.getElementById('screen-result').classList.remove('hidden');
+      document.getElementById('loading-result').classList.remove('hidden');
+      document.getElementById('result-content').classList.add('hidden');
+      
+      try {
+        const url = `${API_URL}?action=validar&qr=${encodeURIComponent(codigo)}`;
+        console.log('Validando:', url);
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        console.log('Respuesta:', data);
+        mostrarResultado(data);
+      } catch (error) {
+        console.error('Error:', error);
+        mostrarResultado({
+          ok: false,
+          estado: 'ERROR',
+          mensaje: '❌ Error de conexión: ' + error.message
+        });
+      }
+    }
+    
+    function mostrarResultado(data) {
+      document.getElementById('loading-result').classList.add('hidden');
+      document.getElementById('result-content').classList.remove('hidden');
+      
+      const iconos = {
+        'VALIDO': '✅', 'NO_EXISTE': '❌', 'YA_USADO': '⚠️',
+        'EXPIRADO': '⏰', 'BLOQUEADO': '🔒', 'CANCELADO': '🚫', 'ERROR': '❓'
+      };
+      
+      document.getElementById('result-icon').textContent = iconos[data.estado] || '❓';
+      document.getElementById('result-message').textContent = data.mensaje;
+      
+      const statusEl = document.getElementById('result-status');
+      statusEl.textContent = data.estado.replace('_', ' ');
+      statusEl.className = 'estado-badge estado-' + data.estado;
+      
+      if (data.ok && data.datos) {
+        const datosEl = document.getElementById('visitor-data');
+        
+        let html = '';
+        if (data.datos.patente && data.datos.patente !== 'Sin vehículo') {
+          html += `<div class="patente-destacada">🚗 ${data.datos.patente}</div>`;
+        }
+        
+        html += `
+          <div class="dato-row">
+            <span class="dato-label">👤 Visitante</span>
+            <span class="dato-valor">${data.datos.personaIngresa || '-'}</span>
+          </div>
+          <div class="dato-row">
+            <span class="dato-label">✍️ Autoriza</span>
+            <span class="dato-valor">${data.datos.personaAutoriza || '-'}</span>
+          </div>
+          <div class="dato-row">
+            <span class="dato-label">🏢 Empresa</span>
+            <span class="dato-valor">${data.datos.empresa || '-'}</span>
+          </div>
+          <div class="dato-row">
+            <span class="dato-label">📍 Área</span>
+            <span class="dato-valor">${data.datos.area || '-'}</span>
+          </div>
+          <div class="dato-row">
+            <span class="dato-label">📅 Día autorizado</span>
+            <span class="dato-valor">${data.datos.diaAutorizado || '-'}</span>
+          </div>
+        `;
+        
+        if (data.datos.observaciones) {
+          html += `
+            <div class="dato-row">
+              <span class="dato-label">📋 Observaciones</span>
+              <span class="dato-valor">${data.datos.observaciones}</span>
+            </div>
+          `;
+        }
+        
+        datosEl.innerHTML = html;
+        datosEl.classList.remove('hidden');
+        document.getElementById('btn-confirm').classList.remove('hidden');
+      } else {
+        document.getElementById('visitor-data').classList.add('hidden');
+        document.getElementById('btn-confirm').classList.add('hidden');
+      }
+    }
+    
+    async function confirmarIngreso() {
+      const btn = document.getElementById('btn-confirm');
+      btn.disabled = true;
+      btn.innerHTML = '<div class="spinner"></div> Procesando...';
+      
+      try {
+        const url = `${API_URL}?action=confirmar&qr=${encodeURIComponent(codigoActual)}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.ok) {
+          mostrarExito(data);
+        } else {
+          alert('⚠️ ' + data.mensaje);
+          btn.disabled = false;
+          btn.innerHTML = '✅ Confirmar Ingreso';
+        }
+      } catch (error) {
+        alert('❌ Error: ' + error.message);
+        btn.disabled = false;
+        btn.innerHTML = '✅ Confirmar Ingreso';
+      }
+    }
+    
+    function mostrarExito(data) {
+      document.getElementById('screen-result').classList.add('hidden');
+      document.getElementById('screen-success').classList.remove('hidden');
+      
+      document.getElementById('success-name').textContent = data.nombre;
+      document.getElementById('success-time').textContent = 'Ingreso registrado a las ' + data.hora;
+      
+      let segundos = 10;
+      document.getElementById('countdown').textContent = segundos;
+      countdownInterval = setInterval(() => {
+        segundos--;
+        document.getElementById('countdown').textContent = segundos;
+        if (segundos <= 0) {
+          clearInterval(countdownInterval);
+          volverEscaneo();
+        }
+      }, 1000);
+    }
+    
+    function volverEscaneo() {
+      if (countdownInterval) clearInterval(countdownInterval);
+      
+      document.getElementById('codigo-manual').value = '';
+      codigoActual = null;
+      
+      document.getElementById('screen-result').classList.add('hidden');
+      document.getElementById('screen-success').classList.add('hidden');
+      document.getElementById('screen-scan').classList.remove('hidden');
+      
+      iniciarEscaner();
+    }
+  </script>
+</body>
+</html>
