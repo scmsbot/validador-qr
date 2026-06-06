@@ -336,9 +336,12 @@ function generarCodigoQR() {
 // Devuelve el blob o null si falla.
 function obtenerQRBlob(codigo) {
   try {
-    var url = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=' +
-      encodeURIComponent('https://scmsbot.github.io/validador-qr?qr=' + codigo);
-    return UrlFetchApp.fetch(url).getBlob().setName('qr.png');
+    var data = 'https://scmsbot.github.io/validador-qr?qr=' + codigo;
+    var url = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&format=png&data=' +
+      encodeURIComponent(data);
+    var blob = UrlFetchApp.fetch(url, { muteHttpExceptions: true }).getBlob();
+    blob.setName('qr.png').setContentType('image/png');
+    return blob;
   } catch (e) {
     Logger.log('Error generando QR blob: ' + e.toString());
     return null;
